@@ -1,0 +1,32 @@
+# Node / Next.js
+node_modules/
+.next/
+out/
+
+# Python / segmenter runtime
+__pycache__/
+*.pyc
+.segmenter-packages/
+.segmenter-cache/
+.venv/
+.venv-*/
+
+# Local media / model assets
+checkpoints/
+*.pt
+*.pth
+*.ckpt
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Logs / OS
+*.log
+.DS_Store
+Thumbs.db
+
+# Temporary
+tmp/
+temp/
