@@ -1,59 +1,56 @@
-# SAM 2 Segmenter Service
+# Segmenter
 
-This folder contains the local Python service for subject segmentation and mask propagation.
+This folder holds the local Python service that does the segmentation work.
 
-## Purpose
+I split it out from the Next app on purpose. The browser is fine for preview tricks, but I do not want the actual subject isolation stack living entirely inside `ffmpeg.wasm` hacks and client memory limits.
 
-The web app should not run real `SAM 2` inference in the browser. Instead, it calls this service for:
+## What it does
 
-- keyframe subject segmentation
-- mask metadata generation
-- later: mask propagation across video frames
+Right now the service:
 
-## Current state
+- accepts a video upload
+- extracts the first frame with `ffmpeg`
+- loads `SAM 2` if the runtime is available
+- runs image prediction with a default center-box prompt
+- returns a simplified mask result back to the app
 
-This is a **production-shaped scaffold**:
-
-- FastAPI server
-- typed request/response models
-- `SAM 2` adapter boundary
-- deterministic fallback when `SAM 2` is not installed yet
-
-The fallback keeps the app functional while we wire the real model.
+If the model runtime is missing, it falls back to a deterministic placeholder response so the rest of the app still works.
 
 ## Files
 
-- `main.py`: FastAPI app and routes
-- `models.py`: request and response schemas
-- `service.py`: orchestration logic
-- `providers/sam2_provider.py`: adapter that can later host real `SAM 2`
-- `requirements.txt`: Python dependencies
+- [main.py](C:\Users\Taz\Rotoscope\segmenter\main.py): FastAPI entrypoint
+- [models.py](C:\Users\Taz\Rotoscope\segmenter\models.py): request/response shapes
+- [service.py](C:\Users\Taz\Rotoscope\segmenter\service.py): service layer
+- [providers/sam2_provider.py](C:\Users\Taz\Rotoscope\segmenter\providers\sam2_provider.py): real model loading and fallback logic
+- [video.py](C:\Users\Taz\Rotoscope\segmenter\video.py): frame extraction
+- [runtime.py](C:\Users\Taz\Rotoscope\segmenter\runtime.py): runtime config
+- [run_segmenter.ps1](C:\Users\Taz\Rotoscope\segmenter\run_segmenter.ps1): local launch script
 
-## Run locally
+## Install
+
+Base dependencies:
 
 ```powershell
 python -m pip install --target .segmenter-packages -r segmenter\requirements.txt
-.\segmenter\run_segmenter.ps1
 ```
 
-If you also want real `SAM 2` inference instead of fallback masks:
+If you want real `SAM 2` inference instead of fallback mode:
 
 ```powershell
 python -m pip install --target .segmenter-packages torch torchvision --index-url https://download.pytorch.org/whl/cu128
 python -m pip install --target .segmenter-packages git+https://github.com/facebookresearch/sam2.git
 ```
 
-The repo now includes a tested default checkpoint location:
+## Run
 
-`checkpoints/sam2.1_hiera_tiny.pt`
+```powershell
+.\segmenter\run_segmenter.ps1
+```
 
-If that file exists, `segmenter/runtime.py` will pick it up automatically.
+That script sets `PYTHONPATH` for the workspace-local package directory and uses the default checkpoint if it exists.
 
-## Planned next step
+## Current limitation
 
-Replace the fallback logic in `providers/sam2_provider.py` with:
+This is not full video tracking yet.
 
-1. real frame decoding
-2. real `SAM 2` checkpoint loading
-3. prompted segmentation on representative frames
-4. persistent mask outputs
+The current live path is good enough to prove out local inference and subject selection, but the next real milestone is mask propagation across frames and storing richer mask data than a simple bounding rectangle.

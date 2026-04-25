@@ -1,64 +1,100 @@
-# Rotoscope Meme Lab
+# ReRasterizer
 
-A browser-first prototype for turning an `mp4` into a rotoscope-style meme edit with:
+This is a personal rotoscoping sandbox I’m building for myself.
 
-- `ffmpeg.wasm` for client-side video processing
-- a `SAM 2` adapter layer for subject segmentation
-- an interactive cloth-mesh preview for mask recovery and stylized gap filling
+The short version:
 
-## Personal-use direction
+- drop in a video clip
+- isolate the main subject with `SAM 2`
+- preview a stylized treatment in the browser
+- keep iterating until the clip feels weird, sharp, or funny enough to export
 
-This repo is currently optimized for your own creative workflow first:
+I may eventually bend this into something more specialized for real-estate asset creation, but that is not the main goal right now. Right now I want a tool that is fun to use and fast to experiment with.
 
-- upload a clip
-- isolate the main subject
-- generate a stylized rotoscope remix
-- experiment quickly with captions, masks, and exports
+## What’s in here
 
-The architecture still leaves room to evolve into a more specialized vertical product later, including real-estate asset extraction if you want to push it in that direction.
+There are two main parts:
 
-## Stack
+1. A Next.js app for the UI, uploads, project state, caption ideas, and browser-side preview work
+2. A local Python segmenter service for `SAM 2`
 
-- Next.js App Router
-- React + TypeScript
-- `@ffmpeg/ffmpeg`
-- `@ffmpeg/util`
-- Tailwind-style utility classes in component markup, backed by custom CSS
+The frontend lives in:
 
-## What is implemented
+- [app](C:\Users\Taz\Rotoscope\app)
+- [components](C:\Users\Taz\Rotoscope\components)
+- [lib](C:\Users\Taz\Rotoscope\lib)
 
-- A full UI scaffold for upload, render settings, viral framing controls, and export flow.
-- A browser FFmpeg service that loads `ffmpeg.wasm`, writes the uploaded source to a virtual FS, and assembles a stylized output.
-- A `SAM 2` segmentation interface with a mock local fallback so the preview flow is wired even before real model weights are added.
-- Your `TacticalCloth` interaction model adapted as a preview component for low-confidence region recovery.
+The segmentation service lives in:
 
-## What still needs a real model asset
+- [segmenter](C:\Users\Taz\Rotoscope\segmenter)
 
-`SAM 2` itself is not bundled here yet. That part needs one of these:
+## Current state
 
-1. browser-compatible SAM 2 weights plus a worker/inference wrapper
-2. a local inference service that the frontend calls
-3. an ONNX/WebGPU export of the model
+What works today:
 
-The code is structured so we can swap that in without rewriting the UI.
+- project scaffold in Next.js App Router
+- Google auth wiring through NextAuth
+- Mongo-backed project and job records
+- Cloudinary signed upload flow
+- AI caption suggestion endpoint
+- local `SAM 2` service boundary
+- real `SAM 2` model loading path when the local runtime is available
+- browser-side preview rendering with `ffmpeg.wasm`
 
-## Run
+What is still rough:
+
+- segmentation is currently first-frame focused, not full multi-frame propagation
+- render jobs are not yet handed off to a real background worker
+- the UI is still closer to a working lab than a polished editor
+- mask output is still simplified for preview instead of being a full asset pipeline
+
+## Why I built it this way
+
+I did not want to make the whole thing browser-only.
+
+`ffmpeg.wasm` is useful for preview and small client-side work, but real segmentation and heavier render steps belong in a local or hosted backend. That is why the repo is split between the web app and a Python segmenter instead of trying to cram everything into one tab.
+
+## Running the app
+
+### Web app
 
 ```powershell
 npm install
 npm run dev
 ```
 
-Then open `http://127.0.0.1:3000`
+Then open:
+
+`http://127.0.0.1:3000`
+
+### Segmenter
+
+The segmenter is a separate local process.
+
+Basic install:
+
+```powershell
+python -m pip install --target .segmenter-packages -r segmenter\requirements.txt
+```
+
+Start it:
+
+```powershell
+.\segmenter\run_segmenter.ps1
+```
+
+By default it looks for the tiny checkpoint here:
+
+`checkpoints/sam2.1_hiera_tiny.pt`
 
 ## Environment
 
-Create a `.env.local` with the services you want enabled:
+Create a `.env.local` file in the repo root.
+
+Minimal app config:
 
 ```env
 NEXT_PUBLIC_API_DOMAIN=http://127.0.0.1:3000
-NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME=your-cloud-name
-NEXT_PUBLIC_STRIPE_KEY=pk_test_...
 NEXT_PUBLIC_SEGMENTER_URL=http://127.0.0.1:8001
 
 MONGODB_URI=mongodb+srv://...
@@ -73,63 +109,55 @@ GOOGLE_CLIENT_SECRET=...
 CLOUDINARY_CLOUD_NAME=...
 CLOUDINARY_API_KEY=...
 CLOUDINARY_API_SECRET=...
+NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME=...
+```
 
+Optional AI caption providers:
+
+```env
 GROQ_API_KEY=...
 GROQ_MODEL=llama-3.3-70b-versatile
 
 OPENROUTER_API_KEY=...
 OPENROUTER_MODEL=openai/gpt-4.1-mini
+```
 
+Segmenter config:
+
+```env
 SEGMENTER_URL=http://127.0.0.1:8001
-SAM2_CHECKPOINT=/absolute/path/to/sam2.1_hiera_tiny.pt
+SAM2_CHECKPOINT=C:\Users\Taz\Rotoscope\checkpoints\sam2.1_hiera_tiny.pt
 SAM2_MODEL_CONFIG=configs/sam2.1/sam2.1_hiera_t.yaml
 SAM2_DEVICE=cuda
 ```
 
-If `GROQ_API_KEY` and `OPENROUTER_API_KEY` are both missing, caption suggestions fall back to local templates.
+If the caption provider keys are missing, the app falls back to local caption templates.
 
-## Key idea
+## Repo layout
 
-The pipeline is intentionally split into three layers:
+```text
+app/            Next.js routes and API handlers
+components/     UI pieces
+lib/            app services, auth, db, ffmpeg, SAM client
+segmenter/      local FastAPI service for SAM 2
+types/          shared TypeScript types
+checkpoints/    local model weights (gitignored)
+```
 
-1. In-browser frame handling and video muxing with `ffmpeg.wasm`
-2. Subject extraction via the `SAM 2` adapter
-3. Viral treatment via captioning, meme packs, posterization, edge emphasis, and overlay behaviors
+## Personal notes
 
-That separation makes it easier to move from a prototype into a serious creator tool without repainting the whole app each time the model layer changes.
+This project is intentionally opinionated toward solo use:
 
-## Current production-shaped pieces
+- I care more about quick iteration than enterprise polish
+- I want local control over the segmentation stack
+- I want the architecture to stay simple enough that I can keep moving without babysitting infrastructure all day
 
-- NextAuth route with Google sign-in support
-- MongoDB-backed `projects` and `jobs`
-- Cloudinary signed direct-to-video upload flow
-- caption suggestion API using Groq or OpenRouter
-- placeholder queued job creation for `SAM 2` and native `ffmpeg` workers
-- local FastAPI `SAM 2` segmenter scaffold in `segmenter/`
+If this becomes more than a personal tool later, great. But I’d rather it be a genuinely useful private tool first than a “startup-ready” repo that never gets used.
 
-## Real SAM 2 path
+## Next things I’d like to add
 
-The segmenter now supports a real inference path when the Python runtime has:
-
-- `torch`
-- `sam2`
-- a valid `SAM2_CHECKPOINT`
-- a matching `SAM2_MODEL_CONFIG`
-- `ffmpeg` available on `PATH`
-
-Current live behavior:
-
-1. the browser uploads the selected video file to the Next.js `/api/segmentations` route
-2. that route forwards the video to the Python segmenter as multipart form data
-3. the segmenter extracts the first frame with `ffmpeg`
-4. `SAM 2` runs image prediction on that frame with a default center-box prompt
-5. the service returns a mask-derived bounding rectangle plus confidence
-
-If any of those dependencies are missing, the segmenter falls back to deterministic placeholder masks.
-
-## Next implementation steps
-
-1. Replace the mock `SAM 2` adapter with a Python service call.
-2. Add a native `ffmpeg` worker that consumes queued render jobs.
-3. Persist timeline edits and mask-repair deltas.
-4. Add Stripe-based usage controls and premium export paths.
+1. Better prompt control for segmentation instead of only the default center-box flow
+2. Real multi-frame mask propagation
+3. Native backend render jobs instead of preview-only browser exports
+4. Cleaner timeline editing
+5. Better audio workflow, including narration / voice track generation
