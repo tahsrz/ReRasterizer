@@ -133,6 +133,83 @@ SAM2_DEVICE=cuda
 
 If the caption provider keys are missing, the app falls back to local caption templates.
 
+## Bringing Subjects to Life: The Zero-Knowledge Workflow
+
+This guide provides a granular, step-by-step path to transforming any video subject into a stylized, interactive AI persona.
+
+### Phase 1: Environment Setup
+Before you begin, ensure your local "lab" is ready.
+
+1.  **Open two terminal windows.**
+2.  **Window 1 (The Brain):** Start the Python Segmentation Service (SAM 2).
+    ```powershell
+    cd Rotoscope
+    $env:SAM2_DEVICE="cpu"
+    .\segmenter\run_segmenter.ps1
+    ```
+    *Wait until you see `Uvicorn running on http://127.0.0.1:8001`.*
+3.  **Window 2 (The Interface):** Start the Next.js Web Studio.
+    ```powershell
+    cd Rotoscope
+    npm run dev
+    ```
+    *Open `http://localhost:3000` in your browser.*
+
+### Phase 2: Acquisition (Getting the Video)
+Find a video where the subject is clearly visible.
+
+1.  **Identify a URL** (YouTube, Twitter, etc.).
+2.  **Download the asset** using `yt-dlp`. This tool handles the "handshake" with video platforms.
+    ```powershell
+    # Replace URL with your video link
+    yt-dlp -f "bestvideo[ext=mp4]+bestaudio[ext=m4a]/mp4" -o "assets/raw/my_subject.mp4" "URL"
+    ```
+
+### Phase 3: Extraction (Defining the Shape)
+We need to tell the AI which part of the video is your "character."
+
+1.  **Submit for Segmentation**: Run this command to upload your video to the local service you started in Phase 1.
+    ```powershell
+    curl.exe -X POST http://127.0.0.1:8001/segment `
+      -F "project_id=my-new-character" `
+      -F "title=Subject Alpha" `
+      -F "file=@assets/raw/my_subject.mp4"
+    ```
+2.  **Verify Results**: The command will return a JSON object. Look for `"mode": "live"`. This means the AI has successfully identified the subject in the first frame.
+
+### Phase 4: Stylization (Defining the Soul)
+Now, use the browser-based Studio (`http://localhost:3000`) to stylize the motion.
+
+1.  **Upload to Studio**: Drag your `my_subject.mp4` into the "Clip" field.
+2.  **Set the Pacing**: 
+    - Adjust **FPS** to `10` or `12` for a classic rotoscope feel.
+    - Set **Posterize** to `6` to flatten colors into a "graphic novel" style.
+3.  **Adjust the Edge**: Use **Edge Mix** to define how much of the original detail bleeds through the tactical filter.
+
+### Phase 5: Implementation (Giving it Life)
+To move your character into a real application (like Sunset Pulse), follow these code steps:
+
+1.  **Move the Asset**: Copy your video to your app's public folder.
+    ```powershell
+    mkdir -p YourApp/public/videos
+    cp Rotoscope/assets/raw/my_subject.mp4 YourApp/public/videos/my_subject.mp4
+    ```
+2.  **Mount the Component**: Use the `TacticalCloth` component in your React code.
+    ```tsx
+    import TacticalCloth from './components/TacticalCloth';
+
+    // This creates the interactive, physics-reactive character
+    <TacticalCloth 
+      id="CHARACTER-01" 
+      status="ACTIVE" 
+      moodColor="#22c55e" 
+      videoSrc="/videos/my_subject.mp4" 
+    />
+    ```
+3.  **Interaction**: Users can now "touch" the character's digital mesh. You can trigger movements programmatically using `clothRef.current.applyForce()`.
+
+---
+
 ## Repo layout
 
 ```text
